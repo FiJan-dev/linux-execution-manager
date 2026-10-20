@@ -1,0 +1,13 @@
+# Estado da VM e ferramentas locais
+.vagrant/
+.agents/
+.codex/
+
+# Arquivos locais
+.env*
+*.log
+.DS_Store
+*~
+
+# Projeto anterior usado apenas como referência local
+/cloud-task-manager/
