@@ -42,23 +42,6 @@ export function LogViewer(props: LogViewerProps) {
   //status mais recente: o que veio com o log, ou o do processo enquanto o log não chegou
   const status = data?.status ?? processo.status;
 
-  //baixa as linhas que estão na tela como arquivo .txt
-  function baixar() {
-    const linhas = data?.linhas ?? [];
-    const texto = linhas.join("\n") + "\n"; //junta as linhas em um texto só, uma por linha
-
-    const blob = new Blob([texto], { type: "text/plain" }); //cria um "arquivo" na memória
-    const url = URL.createObjectURL(blob); //cria um endereço temporário para esse arquivo
-
-    //cria um link escondido, com o nome do arquivo, e clica nele para iniciar o download
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `log-${processo.pid}.txt`;
-    a.click();
-
-    URL.revokeObjectURL(url); //libera o endereço temporário
-  }
-
   return (
     <div className="card">
       {/* cabeçalho: título, comando e os controles */}
@@ -85,9 +68,14 @@ export function LogViewer(props: LogViewerProps) {
             acompanhar o fim
           </label>
 
-          <button className="btn btn-sm" onClick={baixar}>
+          {/* link para o servidor: devolve o arquivo de log inteiro (formato=txt) e o navegador baixa */}
+          <a
+            className="btn btn-sm"
+            href={`${base}?formato=txt`}
+            download={`log-${processo.pid}.txt`}
+          >
             Baixar log
-          </button>
+          </a>
 
           <button className="btn btn-sm" onClick={onFechar}>
             Fechar

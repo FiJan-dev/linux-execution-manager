@@ -1,0 +1,69 @@
+//gerador do cliente: o código que o Next usa para falar com o banco (import de "@prisma/client")
+generator client {
+  provider = "prisma-client-js"
+}
+
+//qual banco usar e onde ele está (a URL vem do arquivo .env)
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+//status possíveis de um processo (os mesmos de lib/types.ts)
+enum StatusProcesso {
+  executando
+  terminado
+  erro
+}
+
+//scripts enviados pelo usuário (.sh e .py)
+model Script {
+  id           String   @id @default(uuid())
+  nome         String   @unique //ex.: monitor.py, não pode repetir
+  tamanhoBytes Int
+  conteudo     String   @db.LongText //até 1 MB, por isso LongText
+  criadoEm     DateTime @default(now())
+
+  //um script pode ter gerado vários processos
+  processos Processo[]
+
+  @@map("scripts")
+}
+
+//ambientes de execução (cgroup + namespace)
+//o status do ambiente NÃO é uma coluna: é calculado a partir dos processos
+model Ambiente {
+  id        String   @id @default(uuid())
+  nome      String   @unique
+  namespace String   @unique //lem-<nome>
+  cpu       Float //núcleos, ex.: 0.5
+  memoriaMb Int
+  ioMbps    Int
+  criadoEm  DateTime @default(now())
+
+  //um ambiente tem vários processos
+  processos Processo[]
+
+  @@map("ambientes")
+}
+
+//um processo para cada script executado dentro de um ambiente
+model Processo {
+  id          String         @id @default(uuid())
+  comando     String //cópia do que rodou (ex.: python3 -u monitor.py)
+  pid         Int //PID no host
+  status      StatusProcesso
+  codigoSaida Int? //só preenchido quando o processo termina
+  iniciadoEm  DateTime       @default(now())
+  finalizadoEm DateTime?
+
+  //ao apagar o ambiente, apaga os processos dele junto
+  ambienteId String
+  ambiente   Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Cascade)
+
+  //ao apagar o script, o processo continua existindo (scriptId vira nulo)
+  scriptId String?
+  script   Script? @relation(fields: [scriptId], references: [id], onDelete: SetNull)
+
+  @@map("processos")
+}

@@ -98,6 +98,10 @@ export function FormAmbiente() {
             onChange={(e) => setNome(e.target.value)}
             placeholder="ex.: teste-web"
             required
+            minLength={2}
+            maxLength={31}
+            pattern="[a-z0-9][a-z0-9\-]{1,30}"
+            title="De 2 a 31 caracteres: letras minúsculas, números e hífen (sem começar com hífen)"
           />
           <span className="hint">
             Letras minúsculas, números e hífen. O namespace será lem-{nome || "nome"}.
