@@ -68,9 +68,9 @@ definir_caminhos() {
   ESTADO="$PASTA/estado"
 }
 
-# descobre o MAJ:MIN do disco físico onde ficam os dados (o io.max precisa do disco, não da partição)
+# descobre o MAJ:MIN do disco físico onde ficam os dados (o io.max precisa do disco, não da partição nem do volume LVM)
 disco_de_dados() {
-  local fonte dev pai
+  local fonte nome
 
   fonte=$(df --output=source "$DADOS" 2>/dev/null | tail -n 1)
 
@@ -78,20 +78,15 @@ disco_de_dados() {
     return
   fi
 
-  dev="$fonte"
+  # lsblk -s mostra o dispositivo e tudo o que está por baixo dele (volume, partição, disco)
+  # fica com o primeiro item do tipo "disk"
+  nome=$(lsblk -snro NAME,TYPE "$fonte" 2>/dev/null | awk '$2 == "disk" { print $1; exit }')
 
-  # sobe de partição (ou volume lógico) até o disco de verdade
-  while true; do
-    pai=$(lsblk -no PKNAME "$dev" 2>/dev/null | head -n 1)
+  if [ -z "$nome" ]; then
+    return
+  fi
 
-    if [ -z "$pai" ]; then
-      break
-    fi
-
-    dev="/dev/$pai"
-  done
-
-  lsblk -dno MAJ:MIN "$dev" 2>/dev/null | tr -d ' '
+  lsblk -dno MAJ:MIN "/dev/$nome" 2>/dev/null | tr -d ' '
 }
 
 # mata tudo o que está no cgroup (inclusive o dono do namespace) e apaga a pasta do cgroup
@@ -159,11 +154,13 @@ cmd_criar() {
 
   mkdir -p "$LOGS" "$ESTADO" || { desfazer_criacao; falhar "não foi possível criar as pastas de $PASTA"; }
 
-  # CPU: "<quota> <período>" em microssegundos; 0,5 núcleo = 50000 de 100000
-  local quota
-  quota=$(awk -v c="$cpu" 'BEGIN { printf "%d", c * 100000 }')
+  # CPU: "<quota> <período>" em microssegundos
+  # o período é de 1 segundo: com o padrão do Linux (100 ms) o limite freava mais do que devia na VM
+  # 0,5 núcleo = 500000 de 1000000
+  local quota periodo=1000000
+  quota=$(awk -v c="$cpu" -v p="$periodo" 'BEGIN { printf "%d", c * p }')
 
-  echo "$quota 100000" > "$CG/cpu.max" || { desfazer_criacao; falhar "não foi possível definir cpu.max"; }
+  echo "$quota $periodo" > "$CG/cpu.max" || { desfazer_criacao; falhar "não foi possível definir cpu.max"; }
 
   # memória: em bytes
   echo $((mem * 1024 * 1024)) > "$CG/memory.max" || { desfazer_criacao; falhar "não foi possível definir memory.max"; }
